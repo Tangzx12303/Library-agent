@@ -1,0 +1,21 @@
+# Streamlit 全局配置
+[server]
+headless = true
+
+# 关闭匿名使用统计，减少前端额外网络请求
+[browser]
+gatherUsageStats = false
+
+[client]
+# minimal：隐藏 Deploy 按钮与运行状态小组件，仅保留精简菜单（后续由自定义 UI 接管）
+toolbarMode = "minimal"
+# 单页应用，隐藏侧边栏页面导航
+showSidebarNavigation = false
+
+[theme]
+base = "light"
+primaryColor = "#3a6ea5"
+backgroundColor = "#f5f7fb"
+secondaryBackgroundColor = "#ffffff"
+textColor = "#1f2937"
+font = "sans serif"

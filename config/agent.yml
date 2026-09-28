@@ -1,0 +1,18 @@
+# ---------------- 多轮对话记忆 ----------------
+# 主阈值：历史消息的 token 预算（token 数由字符启发式估算，见 agent/memory.py）
+# 为什么不用「条数」做阈值：条数不等于长度。一份 Markdown 推荐报告上千 token，
+# 一句「谢谢」十几个 token，两者都算 1 条——按条数截断时预算完全不可控。
+max_history_tokens: 2000
+
+# 安全网：条数上限。token 预算之外再兜一层，防止大量极短消息把条数撑到几百条、
+# 让提示词结构失衡。设为 0 表示完全不携带历史，退化为单轮问答。
+max_history_messages: 50
+
+# 压缩层开关。开启后，被预算挤出去的历史不是直接丢弃，而是交给模型合并进一份
+# 滚动摘要（随 System Prompt 注入，并按读者ID落 MySQL 跨会话保留）；
+# 关闭则退化为「纯 token 截断」，即旧消息直接丢弃。
+memory_summary_enabled: true
+
+# 注：借阅数据原先由 external_data_path 指向 data/external/records.csv，
+# 现已迁入 MySQL（见 config/db.yml）。该 CSV 仅作为 db/init_db.py 的种子来源，
+# 运行期不再读取。

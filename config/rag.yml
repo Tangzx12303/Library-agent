@@ -1,0 +1,33 @@
+# ---------------- 对话模型 ----------------
+# 默认选中的对话模型。必须出现在下面的 chat_model_presets 中，
+# 否则前端下拉框会退回选中列表的第一项（见 model/factory.py:default_chat_model_id）。
+chat_model_name: qwen3.8-max
+
+# 侧边栏可切换的模型清单（label 为展示名，id 为百炼模型广场上的模型 ID）。
+# 所有模型都经百炼的 OpenAI 兼容端点调用，因此通义系列与第三方模型（DeepSeek /
+# GLM / Kimi / MiniMax 等）可以混在同一份列表里。增删此项即可调整下拉框选项。
+#
+# 三个前提，缺一个就会在提问时报错（错误提示已按成因分类，见 describe_dashscope_error）：
+#   1. 模型必须已在百炼控制台开通；
+#   2. 账号若开着「仅使用免费额度」模式，需确保该模型仍有免费额度；
+#   3. ReAct Agent 依赖 function calling，**推理类模型（如 deepseek-r1）不支持工具调用，
+#      放进来也跑不通**，故此清单只收支持工具调用的模型。
+#
+# 本清单中的 ID 均在百炼兼容端点上实测可用；某账号能调通哪些模型还取决于其开通情况，
+# 可执行以下命令查看该 Key 名下全部可用模型：
+#   curl -H "Authorization: Bearer $DASHSCOPE_API_KEY" \
+#        https://dashscope.aliyuncs.com/compatible-mode/v1/models
+chat_model_presets:
+  - { label: 通义千问 Qwen3.8-Max, id: qwen3.8-max }
+  - { label: 通义千问 Qwen3.7-Plus, id: qwen3.7-plus }
+  - { label: 通义千问 Qwen-Plus, id: qwen-plus }
+  - { label: DeepSeek-V4-Pro, id: deepseek-v4-pro }
+  - { label: DeepSeek-V3.2, id: deepseek-v3.2 }
+  - { label: 智谱 GLM-5.2, id: glm-5.2 }
+  - { label: 月之暗面 Kimi-K2.6, id: kimi-k2.6 }
+  - { label: MiniMax-M2.5, id: MiniMax-M2.5 }
+
+# ---------------- 向量化模型 ----------------
+# 百炼的 embedding 只有通义 text-embedding-* 系列，且没有 OpenAI 兼容端点，
+# 故仍由 dashscope SDK 直接调用，不随对话模型的切换而改变。
+embedding_model_name: text-embedding-v4

@@ -1,0 +1,81 @@
+# ==============================================================
+# 智阅通 · 图书馆智能客服 —— 一键部署
+#
+#   1) 复制 .env.example 为 .env，填好 DASHSCOPE_API_KEY 与 MYSQL_PASSWORD
+#   2) docker compose up -d --build
+#   3) 浏览器打开 http://localhost:8501      （admin / admin123 可进管理后台）
+#
+# 详细说明（数据持久化 / 备份 / 重建知识库 / 排错）见 DOCKER_DEPLOY.md
+# ==============================================================
+services:
+
+  # ------------------------------------------------------------
+  # MySQL 8.4：账号 / 馆藏（含库存）/ 借阅记录的唯一数据源
+  # ------------------------------------------------------------
+  mysql:
+    image: mysql:8.4
+    container_name: library-mysql
+    restart: unless-stopped
+    # 库表默认字符集必须与 config/db.yml 的 charset: utf8mb4 对齐，
+    # 否则建表时中文列会退回 latin1，馆藏书名直接变问号。
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    environment:
+      # compose 会自动读取同目录的 .env 做变量插值，所以这里直接复用 MYSQL_PASSWORD
+      MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWORD:?请在 .env 中设置 MYSQL_PASSWORD}
+      MYSQL_DATABASE: library_db
+      TZ: Asia/Shanghai
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      # 用「能真正跑通一条查询」作为就绪判据，比 mysqladmin ping 更可靠：
+      # ping 在权限/认证异常时也可能返回成功。
+      test: ["CMD-SHELL", "mysql -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" -e 'SELECT 1' >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    # 演示环境不需要从宿主机直连数据库；要用 Navicat / CLI 连库时再放开。
+    # 注意一旦暴露到 0.0.0.0，root 口令就是唯一的防线。
+    # ports:
+    #   - "127.0.0.1:3306:3306"
+
+  # ------------------------------------------------------------
+  # 应用：Streamlit + LangChain ReAct Agent
+  # ------------------------------------------------------------
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: library-agent:latest
+    container_name: library-agent
+    restart: unless-stopped
+    env_file:
+      - .env                          # DASHSCOPE_API_KEY + MYSQL_PASSWORD
+    environment:
+      # 覆盖 config/db.yml 里的 127.0.0.1（容器内它指向容器自己），
+      # 改用 compose 的服务名走 Docker 内建 DNS 解析。
+      MYSQL_HOST: mysql
+      MYSQL_PORT: "3306"
+      MYSQL_DATABASE: library_db
+      # 首次启动自动执行 python -m db.init_db（幂等，可安全重复执行）
+      INIT_DB_ON_START: "1"
+      DB_WAIT_SECONDS: "90"
+    ports:
+      - "8501:8501"
+    volumes:
+      # 向量库 + MD5 台账。首次启动时 Docker 会用镜像里预置的内容填充这个空卷，
+      # 所以开箱就能检索，不需要重跑 load_document()。
+      - state_data:/app/state
+      # 日志按天落盘。控制台已输出 INFO 级日志，若要在宿主机直接翻 DEBUG 明细，
+      # 把这个换成 bind mount：./logs:/app/logs
+      - log_data:/app/logs
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+volumes:
+  mysql_data:
+  state_data:
+  log_data:

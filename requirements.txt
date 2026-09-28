@@ -1,0 +1,48 @@
+# ==============================================
+# LangChain ReAct Agent · 智能客服
+# 安装：pip install -r requirements.txt
+#
+# 说明：代码使用的是 LangChain 1.x 的 create_agent + middleware API，
+# 因此此处为 1.x 版本（原 README 中的 0.3.x 与代码不匹配）。
+# 已在 Python 3.13 上验证通过。
+# ==============================================
+
+# LangChain 核心
+langchain==1.4.0
+langchain-core==1.6.2
+langchain-community==0.4.2
+
+# 向量数据库
+langchain-chroma==1.1.0
+chromadb==1.5.9
+langchain-text-splitters==1.1.2
+
+# Agent 编排
+langgraph==1.2.11
+
+# 前端
+streamlit==1.63.0
+
+# 文档处理
+pypdf==6.18.0
+pyyaml==6.0.3
+
+# 阿里云百炼模型
+# dashscope 仅用于 embedding（百炼的向量化接口没有 OpenAI 兼容端点）；
+# 对话模型统一走百炼的 OpenAI 兼容端点，因此需要 langchain-openai。
+dashscope==1.27.4
+langchain-openai==1.6.2
+openai==3.16.2
+
+# 环境变量加载（.env）
+python-dotenv==1.2.3
+
+# 数据库（MySQL）
+# cryptography 为 MySQL 8 默认的 caching_sha2_password 认证所必需
+PyMySQL==1.2.0
+cryptography==50.0.1
+
+# ---------------- 测试（仅开发环境需要）----------------
+# 运行：python -m pytest
+# 容器内不跑测试；若想让生产镜像更干净，可把这一行挪到单独的 dev 依赖文件。
+pytest==9.1.1

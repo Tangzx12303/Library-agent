@@ -1,0 +1,156 @@
+/* ============================================================
+   智阅通 · 图书馆智能客服 —— 自定义样式
+   配合 .streamlit/config.toml 使用
+   ============================================================ */
+
+/* ------------------------------------------------------------
+   顶部原生工具栏：隐藏「控件」，但保留 header 容器本身。
+
+   踩坑记录：以前这里写的是 header[data-testid="stHeader"] { display: none; }，
+   而「展开侧边栏」按钮（stExpandSidebarButton）恰恰渲染在这个 header 里 ——
+   整个 header 一藏，侧边栏一旦收起就再没有任何入口能把它打开，
+   这正是「左侧边栏关闭后无法重新打开」的根因（折叠状态还存在 localStorage，
+   刷新页面也救不回来）。所以改成下面的写法：容器保留、底色透明、
+   浮层不接管鼠标事件，只把不要的原生控件逐个隐藏掉。
+
+   附带说明：header 是 position:absolute 的浮层，横跨顶部整条，
+   若不给它 pointer-events: none，会挡住主内容区顶部的点击。
+   ------------------------------------------------------------ */
+header[data-testid="stHeader"],
+header[data-testid="stHeader"] [data-testid="stToolbar"] {
+    background: transparent;
+    pointer-events: none;
+}
+
+/* Deploy / 运行状态 / 右上角菜单等原生控件。
+   toolbarMode="minimal" 下大多不会渲染，这里写全是留个保险：
+   日后改回默认 toolbarMode，外观也不会突然冒出原生 chrome。 */
+header[data-testid="stHeader"] [data-testid="stAppDeployButton"],
+header[data-testid="stHeader"] [data-testid="stMainMenu"],
+header[data-testid="stHeader"] [data-testid="stStatusWidget"],
+header[data-testid="stHeader"] [data-testid="stToolbarActions"],
+header[data-testid="stHeader"] [data-testid="stHeaderLogo"] {
+    display: none !important;
+}
+
+/* 唯独放行「展开侧边栏」按钮：
+   窄屏下侧边栏的锁定会自动降级为可折叠（避免盖住正文），
+   必须留一个把它重新展开的入口。 */
+header[data-testid="stHeader"] [data-testid="stExpandSidebarButton"] {
+    pointer-events: auto;
+}
+
+footer {
+    visibility: hidden;
+}
+#MainMenu {
+    visibility: hidden;
+}
+
+/* 全局字体与平滑渲染 */
+html,
+body,
+[class*="css"] {
+    font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC",
+        -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* 应用背景 */
+.stApp {
+    background: linear-gradient(180deg, #f5f7fb 0%, #eef2f7 100%);
+}
+
+/* 顶部标题栏 */
+.app-header {
+    padding: 1.1rem 1.4rem 0.7rem 1.4rem;
+    border-bottom: 1px solid #e5e9f0;
+    margin-bottom: 0.6rem;
+}
+.app-title {
+    font-size: 1.7rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    color: #1f2937;
+}
+.app-title .grad {
+    background: linear-gradient(90deg, #3a6ea5 0%, #5b8fc9 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+.app-subtitle {
+    color: #6b7280;
+    font-size: 0.92rem;
+    margin-top: 0.25rem;
+}
+
+/* 侧边栏：显式固定为「常驻面板」。
+   不可折叠的**根因修复**在 app.py 的 initial_sidebar_state="locked"（见该处注释），
+   这里只负责视觉上的「固定」。
+   Streamlit 1.63 中侧边栏（stSidebar）与主内容区（stMain）是平级的 flex 兄弟，
+   主内容区才是独立滚动容器，因此侧边栏天然不随主内容滚动。
+   这里用 position: sticky + top: 0 + 100vh 作为兜底，把「固定」这一意图写明确：
+   —— sticky 不脱离文档流，右侧的拖拽把手（re-resizable）仍能正常定位；
+   —— 注意不要改成 position: fixed，也不要在侧边栏上设置 overflow，
+      那两样才会把把手裁掉、破坏默认布局，反而让侧边栏「固定不住」；
+   —— 也不要用 min-width/max-width 去硬锁宽度：那会与拖拽把手打架，
+      锁定后宽度已由前端限定在 200~600px，不需要额外的 CSS 兜底。 */
+[data-testid="stSidebar"] {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    background: #ffffff;
+    border-right: 1px solid #e5e9f0;
+}
+[data-testid="stSidebar"] .sidebar-logo {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: #1f2937;
+    margin-bottom: 0.2rem;
+}
+.sidebar-note {
+    color: #6b7280;
+    font-size: 0.85rem;
+    line-height: 1.6;
+}
+
+/* 聊天气泡 */
+[data-testid="stChatMessage"] {
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 0.7rem 1rem;
+    box-shadow: 0 1px 3px rgba(16, 24, 40, 0.06);
+    margin-bottom: 0.4rem;
+}
+
+/* 按钮（含快捷提问） */
+div[data-testid="stButton"] button {
+    border-radius: 10px;
+    border: 1px solid #dbe3ee;
+    background: #f7f9fc;
+    color: #334155;
+    transition: all 0.15s ease;
+}
+div[data-testid="stButton"] button:hover {
+    border-color: #3a6ea5;
+    color: #3a6ea5;
+    background: #eef4fb;
+}
+
+/* 主按钮（清空对话等） */
+div[data-testid="stButton"] button[kind="primary"] {
+    background: #3a6ea5;
+    border-color: #3a6ea5;
+    color: #ffffff;
+}
+div[data-testid="stButton"] button[kind="primary"]:hover {
+    background: #2f5b8a;
+    border-color: #2f5b8a;
+    color: #ffffff;
+}
+
+/* 输入框 */
+[data-testid="stChatInput"] {
+    border-top: 1px solid #e5e9f0;
+}
