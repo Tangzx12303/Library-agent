@@ -48,6 +48,11 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        # BuildKit 预定义代理参数仅用于构建网络请求。
+        HTTP_PROXY: ${HTTP_PROXY:-}
+        HTTPS_PROXY: ${HTTPS_PROXY:-}
+        NO_PROXY: ${NO_PROXY:-mysql,localhost,127.0.0.1}
     image: library-agent:latest
     container_name: library-agent
     restart: unless-stopped
@@ -59,6 +64,10 @@ services:
       MYSQL_HOST: mysql
       MYSQL_PORT: "3306"
       MYSQL_DATABASE: library_db
+      # 可选：应用访问 DashScope 等公网服务时使用；mysql 必须在 NO_PROXY 中。
+      HTTP_PROXY: ${HTTP_PROXY:-}
+      HTTPS_PROXY: ${HTTPS_PROXY:-}
+      NO_PROXY: ${NO_PROXY:-mysql,localhost,127.0.0.1}
       # 首次启动自动执行 python -m db.init_db（幂等，可安全重复执行）
       INIT_DB_ON_START: "1"
       DB_WAIT_SECONDS: "90"

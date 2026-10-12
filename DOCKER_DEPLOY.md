@@ -82,6 +82,20 @@ DASHSCOPE_API_KEY=sk-xxxxxx      # 阿里云百炼控制台申请
 MYSQL_PASSWORD=<换成一个强口令>    # 这个值同时作为 MySQL root 口令
 ```
 
+### 3.2.1 可选代理
+
+如果构建依赖或应用访问 DashScope 需要经过代理，在 `.env` 中按需取消代理变量注释并填写实际地址：
+
+```ini
+HTTP_PROXY=http://host.docker.internal:7890
+HTTPS_PROXY=http://host.docker.internal:7890
+NO_PROXY=mysql,localhost,127.0.0.1
+```
+
+地址和端口以当前网络中的代理服务为准。容器内的 `127.0.0.1` 是容器自身；代理运行在 Windows 宿主机时，可使用 `host.docker.internal`。`NO_PROXY` 必须包含 `mysql`，否则应用连接 MySQL 时可能错误地走外部代理。代理认证信息只放在未提交的 `.env` 中。
+
+这些变量会传给镜像构建步骤和应用容器。**拉取 `mysql:8.4`、`python:3.13-slim` 基础镜像由 Docker 引擎执行**，Compose 变量无法代理这一步：请在 Docker Desktop 的 **Settings → Resources → Proxies**（部分版本为 **Settings → Proxies**）配置可用的 HTTP/HTTPS 代理，应用设置并重启 Docker Desktop，再运行 `docker compose up -d --build`。企业网络也可使用 Docker Desktop 的系统代理设置。
+
 > ⚠️ `MYSQL_PASSWORD` 会被 compose 同时用于两处：MySQL 容器的 `MYSQL_ROOT_PASSWORD`，以及应用连库时的口令。
 > 改它等于改数据库 root 口令 —— **数据库已初始化后再改，会导致应用连不上**（见 8.4）。
 
@@ -399,6 +413,8 @@ docker image rm library-agent:latest
 | 中文变问号 `???` | MySQL 字符集不是 utf8mb4 | 确认 compose 里 `--character-set-server=utf8mb4` 生效；已建库需按 7.3 重建 |
 | 回答「白屏一段时间后整段出现」 | 流式失效 | 这是 `model/factory.py` 的 `StreamingChatTongyi` 负责的，非容器问题；确认镜像用的是仓库最新代码 |
 | 构建卡在 `pip install` | 网络 / 镜像源 | 换源：`--build-arg PIP_INDEX_URL=https://pypi.org/simple --build-arg PIP_TRUSTED_HOST=pypi.org` |
+| `docker compose up` 拉取 `mysql:8.4` 或 `python:3.13-slim` 失败 | Docker 引擎无法访问 Docker Hub；容器代理变量对此无效 | 在 Docker Desktop 配置引擎代理并重启；应用容器代理见 3.2.1 |
+| 构建或应用访问公网超时 | 构建/应用容器未配置可达代理，或代理地址误用容器内的 `127.0.0.1` | 在 `.env` 配置 `HTTP_PROXY` / `HTTPS_PROXY`；宿主机代理可用 `host.docker.internal`，并保留 `NO_PROXY=mysql,localhost,127.0.0.1` |
 | 构建报 `no such file or directory: docker/entrypoint.sh` | 脚本是 CRLF 换行 | Dockerfile 已用 `sed -i 's/\r$//'` 处理；若仍报错，检查 `.dockerignore` 是否误排除了 `docker/` |
 | 宿主机 8501 端口被占 | 本地已有服务 | 改 `ports: "8502:8501"` |
 | `docker compose up` 报 `no configuration file provided` | 用了旧版 `docker-compose` v1 | 用 `docker compose`（v2，空格） |
