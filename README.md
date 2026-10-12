@@ -22,7 +22,7 @@
 
 ## 项目简介
 
-基于 LangChain 框架实现的 **ReAct（Reasoning + Acting）Agent**，集成 RAG 检索增强、多工具调用和动态提示词切换。系统能根据读者意图自动判断任务类型（知识问答 / 个性化推荐报告），调用合适的工具和知识库完成推理，并通过 Streamlit 流式界面实时展示 Agent 的思考与执行过程。示例场景为图书馆智能客服，可回答功能分区、图书分类、馆藏管理、借阅服务等问题，并基于读者借阅数据生成个性化推荐。
+基于 LangChain 框架实现的 **ReAct（Reasoning + Acting）Agent**，集成 RAG 检索增强、多工具调用和动态提示词切换。系统能根据读者意图自动判断任务类型（知识问答 / 个性化推荐报告），调用合适的工具和知识库完成推理，并通过 Streamlit 流式界面实时展示 Agent 的思考与执行过程。示例场景为图书馆智能客服，可回答功能分区、图书分类、馆藏管理、借阅服务等问题，并基于读者借阅数据生成个性化推荐；历史对话可按 token 预算压缩为跨会话记忆，每轮回答还会生成在线质检结果。
 
 系统采用 **MySQL 作为唯一数据源**：读者/管理员账号、馆藏书目（含可借库存）、借阅记录全部落库。提供**读者登录**与**管理员后台**两套视图；推荐报告强制约束「只能推荐在馆且可借数量大于 0 的图书」，杜绝推荐不存在的书或已借空的书。
 
@@ -99,10 +99,12 @@
 | **MySQL 数据源** | 账号 / 馆藏（含库存）/ 借阅记录全部落库；`python -m db.init_db` 一键建库建表灌数据 |
 | **在馆可借强约束** | 推荐书目只能取自 `search_books_by_category` / `search_book` 的返回结果，且可借数量必须 > 0，已借空的书不得列入推荐 |
 | **真实账号体系** | 读者注册 / 登录后以真实身份提问；口令以 PBKDF2-SHA256 加盐哈希存储，不存明文 |
-| **管理员后台** | 用户管理（增删 / 启用禁用 / 重置密码）、借阅历史查询（月度汇总 + 明细）、图书与库存维护 |
+| **管理员后台** | 用户管理（增删 / 启用禁用 / 重置密码）、借阅历史查询（月度汇总 + 明细）、图书与库存维护、跨会话记忆管理、在线质检看板 |
 | **多工具调用** | 馆藏检索 / 类别查可借 / 座位查询 / 开放时间 / 借阅数据 / 推荐报告上下文填充，Agent 按需自动选择 |
 | **动态提示词切换** | Middleware 根据运行时上下文自动切换「知识问答」与「推荐报告」两套 System Prompt |
-| **多轮对话上下文** | 携带最近若干轮问答（默认 10 条，可配），能理解「它」「那本书」「再推荐几本」等指代与省略式追问；对话内读者身份与登录身份一致 |
+| **多轮对话上下文** | 依据 token 预算携带近期问答（默认 2000 token，最多 50 条，可配），能理解「它」「那本书」「再推荐几本」等指代与省略式追问；对话内读者身份与登录身份一致 |
+| **跨会话记忆** | 超出预算的历史由当前模型压缩成摘要，并按读者 ID 存入 MySQL；管理员可查看或清除 |
+| **在线对话质检** | 每轮自动评测检查项、工具调用与推荐书目，读者可查看本轮结果，管理员可查看历史指标与趋势 |
 | **多模型可切换** | 统一经百炼的 OpenAI 兼容端点调用，侧边栏可实时切换通义千问 / DeepSeek / GLM / Kimi / MiniMax 等模型；对话、RAG 总结、历史压缩三条链路同步换用所选模型，无需改代码、无需重启 |
 | **流式对话界面** | Streamlit 构建，支持 token 级流式输出、历史消息留存、Agent 推理过程可见，界面全中文化（原生 Deploy / 三点菜单已隐藏） |
 | **模块化结构** | Agent / RAG / Model / Tools / DB / Middleware 独立模块，配置 YAML 驱动 |
@@ -215,11 +217,23 @@ streamlit run app.py
 - *图书馆有哪些功能分区？* → 追问 *那自习区呢？*（省略主语的指代式追问）
 - *根据我的借阅数据进行个性化推荐* → 追问 *再推荐几本科幻类的*（引用上轮数据 + 补充新偏好）
 
-**管理员视图**（用 `admin` / `admin123` 登录）三个标签页：
+**管理员视图**（用 `admin` / `admin123` 登录）五个标签页：
 
 - **用户管理** —— 查看全部账号；新增读者；启用/禁用；重置密码；删除账号
 - **借阅查询** —— 选择读者，查看其月度借阅汇总与借阅明细（`reader1001` 为 12 个月汇总 + 24 条明细）
 - **图书管理** —— 查看馆藏与库存；新增图书；调整总复本数与可借数量
+- **记忆与摘要** —— 查看各读者的跨会话记忆，并可清除指定读者的摘要
+- **质检看板** —— 按时间、模型和场景筛选真实对话的质检记录，查看检查项失败分布、趋势与模型对比
+
+### 运行测试
+
+```bash
+python -m pytest
+```
+
+### Docker 部署
+
+项目提供 Docker Compose 部署方式，包含 Streamlit 应用与 MySQL；数据卷持久化数据库、向量库/MD5 台账和日志。详细步骤、备份恢复与排错说明见 [DOCKER_DEPLOY.md](DOCKER_DEPLOY.md)。
 
 ## 项目结构
 
@@ -227,6 +241,7 @@ streamlit run app.py
 LangChain-ReAct-Agent/
 │
 ├── agent/                          # Agent 核心
+│   ├── memory.py                   #   token 预算、多轮历史裁剪与摘要压缩
 │   ├── react_agent.py              #   ReAct Agent 主逻辑（流式执行）
 │   └── tools/
 │       ├── agent_tools.py          #   工具函数（RAG检索/馆藏检索/座位/开放时间/借阅数据/报告）
@@ -234,7 +249,7 @@ LangChain-ReAct-Agent/
 │
 ├── db/                             # 数据库层（MySQL）
 │   ├── connection.py               #   连接与查询封装（PyMySQL）
-│   ├── repository.py               #   DAO：用户 / 图书 / 借阅
+│   ├── repository.py               #   DAO：用户 / 图书 / 借阅 / 记忆 / 质检
 │   └── init_db.py                  #   建库建表 + 种子数据（python -m db.init_db）
 │
 ├── rag/                            # RAG 检索增强
@@ -254,7 +269,11 @@ LangChain-ReAct-Agent/
 ├── prompts/                        # 提示词模板
 │   ├── main_prompt.txt             #   知识问答 System Prompt
 │   ├── rag_summarize.txt           #   RAG 总结 Prompt
-│   └── report_prompt.txt           #   推荐报告生成 System Prompt
+│   ├── report_prompt.txt           #   推荐报告生成 System Prompt
+│   └── memory_summary.txt          #   历史对话压缩摘要 Prompt
+
+├── quality/                        # 在线对话质检、指标、轨迹与看板图表
+├── tests/                          # pytest 自动化测试
 │
 ├── utils/                          # 工具函数
 │   ├── config_handler.py           #   YAML 配置加载 + .env 加载
@@ -271,6 +290,10 @@ LangChain-ReAct-Agent/
 │   └── style.css                   #   UI 自定义样式
 ├── .streamlit/
 │   └── config.toml                 #   Streamlit 配置（隐藏 Deploy/工具栏、主题）
+├── Dockerfile                      # Docker 应用镜像
+├── docker-compose.yml              # Streamlit + MySQL 服务编排
+├── docker/entrypoint.sh            # 容器启动引导
+├── DOCKER_DEPLOY.md                # Docker 部署、数据维护与排错指南
 ├── app.py                          # Streamlit 应用入口（登录 / 读者客服 / 管理后台）
 ├── requirements.txt
 └── README.md
@@ -284,6 +307,8 @@ LangChain-ReAct-Agent/
 | `books` | 馆藏书目：书名、作者、类别、索书号、馆藏位置、**总复本数 / 可借数量** |
 | `borrow_records` | 借阅明细：读者、书名、借阅月、借出/应还/归还日期、状态 |
 | `borrow_monthly` | 月度借阅汇总：偏好类别、月借册数、阅读时长、在借图书、对比分析 |
+| `conversation_memory` | 每位读者一条跨会话记忆摘要及更新时间 |
+| `eval_turn_records` | 每轮对话的质检结果、场景、模型、指标与派生检查明细 |
 
 > 明细与汇总拆成两张表：汇总里的「阅读时长」「对比分析」是预计算统计值，无法由明细推导，
 > 故保留一份汇总供推荐报告直接读取。
@@ -298,7 +323,7 @@ LangChain-ReAct-Agent/
 | `chroma.yml` | Chroma 持久化路径、分块大小、检索 Top-K、支持的文件类型 |
 | `db.yml` | MySQL 主机、端口、用户名、库名、字符集（口令在 `.env`） |
 | `prompts.yml` | 各场景提示词模板文件路径 |
-| `agent.yml` | 多轮对话历史长度（`max_history_messages`） |
+| `agent.yml` | 历史 token 预算、消息条数上限及摘要压缩开关（`max_history_tokens`、`max_history_messages`、`memory_summary_enabled`） |
 
 首次运行需要：**DashScope API Key 已设置**、**MySQL 已启动且口令正确**、**已执行 `python -m db.init_db`**、`data/` 目录下有知识库文档。
 
